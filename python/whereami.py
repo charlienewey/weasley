@@ -172,4 +172,4 @@ class Weasel(object):
 
 if __name__ == "__main__":
     W = Weasel(host="localhost", port=6789)
-    W.run()
+    W.run(quiet=True)
