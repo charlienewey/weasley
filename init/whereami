@@ -1,0 +1,45 @@
+#!/bin/sh
+
+# PROVIDE: whereami
+# KEYWORD: shutdown
+PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin"
+
+. /etc/rc.subr
+
+name="whereami"
+rcvar="whereami_enable"
+extra_commands="status"
+
+load_rc_config whereami
+: ${whereami_enable:="NO"}
+
+status_cmd="whereami_status"
+start_cmd="whereami_start"
+stop_cmd="whereami_stop"
+restart_cmd="whereami_restart"
+
+whereami="/usr/local/var/www/whereami"
+whereami_start() {
+    whereami_stop;
+    cd $whereami && sudo -u www sh -c ". ./bin/activate && python whereami.py"
+}
+
+whereami_stop() {
+    sudo -u www sh -c "kill `sockstat -4l | grep 6789 | awk '{ print $3 }'`"
+}
+
+whereami_status() {
+    if sockstat -4l | grep -q 6789
+    then
+        echo "\"whereami\" is running."
+    else
+        echo "\"whereami\" is not running."
+    fi
+}
+
+whereami_restart() {
+    whereami_stop;
+    whereami_start;
+}
+
+run_rc_command "$1"
