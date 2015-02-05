@@ -130,11 +130,11 @@ class Weasel(object):
         self.app.route("/lon", method="GET", callback=self.longitude)
         self.app.route("/time", method="GET", callback=self.time)
 
-    def run(self):
+    def run(self, **kwargs):
         """
         Run the main Bottle instance.
         """
-        self.app.run(host=self.host, port=self.port)
+        self.app.run(host=self.host, port=self.port, **kwargs)
 
     def latitude(self):
         """
