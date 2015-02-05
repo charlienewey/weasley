@@ -21,11 +21,11 @@ restart_cmd="whereami_restart"
 whereami="/usr/local/var/www/whereami"
 whereami_start() {
     whereami_stop;
-    cd $whereami && sudo -u www sh -c ". ./bin/activate && python whereami.py"
+    cd $whereami && sudo -u www sh -c ". ./bin/activate && python whereami.py &"
 }
 
 whereami_stop() {
-    sudo -u www sh -c "kill `sockstat -4l | grep 6789 | awk '{ print $3 }'`"
+    sudo -u www sh -c "kill `sockstat -4l | grep 6789 | awk '{ print $3 }'` 2>/dev/null"
 }
 
 whereami_status() {
