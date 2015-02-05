@@ -1,0 +1,20 @@
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name whereami.assemblyco.de;
+    server_tokens off;
+
+    location / {
+        proxy_set_header    X-Real-IP $remote_addr;
+        proxy_set_header    X-Forwarded-For $remote_addr;
+        proxy_set_header    Host $host;
+        proxy_pass          http://127.0.0.1:6789;
+
+        include whereami.assemblyco.de.allow.conf;
+        deny all;
+    }
+
+    access_log /var/log/nginx/whereami_access.log;
+    error_log /var/log/nginx/whereami_error.log;
+}
