@@ -32,7 +32,7 @@ class OpenPaths(object):
         self.last_point = None
         self.fetch_last_point()
 
-        self.last_point_refresh_timer = 300  # 5 minutes
+        self.refresh_timer = 300  # 5 minutes
         self._update_last_point()  # Update 'self.last_point' periodically
 
     def _api_auth_header(self):
@@ -58,7 +58,8 @@ class OpenPaths(object):
         """
         Start a 5-minute timer and update 'self.last_point' when complete.
         """
-        threading.Timer(self.last_point_refresh_timer, self.fetch_last_point)
+        timer = threading.Timer(self.refresh_timer, self.fetch_last_point)
+        timer.start()
 
     def get(self, params):
         """
