@@ -1,0 +1,5 @@
+bottle
+httplib2
+oauth2
+requests
+simplejson
