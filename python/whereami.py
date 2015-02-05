@@ -81,8 +81,6 @@ class OpenPaths(object):
         # Get the request
         response = requests.get(self.url, params=params, headers=self.auth)
         while response.status_code != 200:
-            print("Authentication token no longer valid, re-fetching...")
-
             # Fetch new auth code
             self.auth = self._api_auth_header()
 
