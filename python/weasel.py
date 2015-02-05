@@ -18,22 +18,24 @@ class OpenPaths(object):
     """
     Simple class to interact with data in the OpenPaths API.
     """
-    def __init__(self, access, secret, header_max_age=50):
+    def __init__(self, access, secret):
         self.url = "https://openpaths.cc/api/1"
         self.access = access
         self.secret = secret
 
         # Set up authentication
         self.auth_age = 0
-        self.auth_max_age = header_max_age
         self.auth = self._api_auth_header()
 
         # Fetch most recent data point from OpenPaths
         self.last_point = None
         self.fetch_last_point()
 
-        self.refresh_timer = 300  # 5 minutes
-        self._update_last_point()  # Update 'self.last_point' periodically
+        # Update 'self.last_point' in a loop
+        self.refresh_timer = 180
+        loop = threading.Thread(target=self._update_last_point)
+        loop.daemon = True  # Exit when only daemon threads are left
+        loop.start()
 
     def _api_auth_header(self):
         """
@@ -56,10 +58,17 @@ class OpenPaths(object):
 
     def _update_last_point(self):
         """
-        Start a 5-minute timer and update 'self.last_point' when complete.
+        Update 'self.last_point' and run a timer when complete.
         """
-        timer = threading.Timer(self.refresh_timer, self.fetch_last_point)
-        timer.start()
+        while True:
+            self.last_point = self.get({"num_points": 1})
+            time.sleep(self.refresh_timer)
+
+    def fetch_last_point(self):
+        """
+        Update 'self.last_point' with the most recent point from OpenPaths.
+        """
+        self.last_point = self.get({"num_points": 1})
 
     def get(self, params):
         """
@@ -69,22 +78,17 @@ class OpenPaths(object):
         @param params Parameters to send in the request to the API.
         @returns A dictionary containing the JSON-ified response.
         """
-        # If header age > max age, then fetch a new one
-        self.auth_age += 1
-        if self.auth_age > self.auth_max_age:
+        # Get the request
+        response = requests.get(self.url, params=params, headers=self.auth)
+        while response.status_code != 200:
+            print("Authentication token no longer valid, re-fetching...")
+
+            # Fetch new auth code
             self.auth = self._api_auth_header()
 
-        # Get the request
-        response = requests.get(self.url, params=params,
-                                headers=self.auth).text
-
-        return json.loads(response)
-
-    def fetch_last_point(self):
-        """
-        Update 'self.last_point' with the most recent point from OpenPaths.
-        """
-        self.last_point = self.get({"num_points": 1})
+            # Try again
+            return self.get(params)
+        return json.loads(response.text)
 
 
 class Weasel(object):
