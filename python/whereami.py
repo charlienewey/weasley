@@ -10,7 +10,6 @@ import datetime
 import oauth2
 import requests
 import simplejson as json
-import threading
 import time
 
 
@@ -29,13 +28,6 @@ class OpenPaths(object):
 
         # Fetch most recent data point from OpenPaths
         self.last_point = None
-        self.fetch_last_point()
-
-        # Update 'self.last_point' in a loop
-        self.refresh_timer = 180
-        loop = threading.Thread(target=self._update_last_point)
-        loop.daemon = True  # Exit when only daemon threads are left
-        loop.start()
 
     def _api_auth_header(self):
         """
@@ -56,20 +48,6 @@ class OpenPaths(object):
 
         return request.to_header()
 
-    def _update_last_point(self):
-        """
-        Update 'self.last_point' and run a timer when complete.
-        """
-        while True:
-            self.last_point = self.get({"num_points": 1})
-            time.sleep(self.refresh_timer)
-
-    def fetch_last_point(self):
-        """
-        Update 'self.last_point' with the most recent point from OpenPaths.
-        """
-        self.last_point = self.get({"num_points": 1})
-
     def get(self, params):
         """
         Send a GET request to the OpenPaths API with the provided parameters
@@ -87,6 +65,21 @@ class OpenPaths(object):
             # Try again
             return self.get(params)
         return json.loads(response.text)
+
+    def get_last_lat(self):
+        params = {"num_points": 1}
+
+        return self.get(params)[0]["lat"]
+
+    def get_last_lon(self):
+        params = {"num_points": 1}
+
+        return self.get(params)[0]["lon"]
+
+    def get_last_time(self):
+        params = {"num_points": 1}
+
+        return self.get(params)[0]["t"]
 
 
 class WhereAmI(object):
@@ -140,7 +133,7 @@ class WhereAmI(object):
 
         @returns The most recent OpenPaths latitude as a string.
         """
-        return str(self.openpaths.last_point[0]["lat"])
+        return str(self.openpaths.get_last_lat())
 
     def longitude(self):
         """
@@ -148,7 +141,7 @@ class WhereAmI(object):
 
         @returns The most recent OpenPaths longitude as a string.
         """
-        return str(self.openpaths.last_point[0]["lon"])
+        return str(self.openpaths.get_last_lon())
 
     def time(self):
         """
@@ -156,7 +149,7 @@ class WhereAmI(object):
 
         @returns The most recent OpenPaths timestamp.
         """
-        dt = datetime.datetime.fromtimestamp(self.openpaths.last_point[0]["t"])
+        dt = datetime.datetime.fromtimestamp(self.openpaths.get_last_time())
         return dt.isoformat()
 
     def root(self):
