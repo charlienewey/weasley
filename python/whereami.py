@@ -89,7 +89,7 @@ class OpenPaths(object):
         return json.loads(response.text)
 
 
-class Weasel(object):
+class WhereAmI(object):
     """
     Main web app, serving out the most recent location data.
     """
@@ -169,5 +169,5 @@ class Weasel(object):
 
 
 if __name__ == "__main__":
-    W = Weasel(host="localhost", port=6789)
+    W = WhereAmI(host="localhost", port=6789)
     W.run(quiet=True)
