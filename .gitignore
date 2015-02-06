@@ -1,6 +1,8 @@
 whereami.assemblyco.de.allow.conf
 settings.json
 
+.DS_Store
+
 bin/
 include/
 lib/
