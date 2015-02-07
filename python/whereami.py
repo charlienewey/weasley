@@ -1,19 +1,16 @@
 #! /usr/bin/env python
 
 """
-Simple web service to consume OpenPaths data over HTTPS and serve the most
-recent OpenPaths data point over HTTP.
 """
 
-import bottle
-import datetime
+import math
 import oauth2
 import requests
 import simplejson as json
 import time
 
 
-class OpenPaths(object):
+class OpenPathsAPI(object):
     """
     Simple class to interact with data in the OpenPaths API.
     """
@@ -66,39 +63,68 @@ class OpenPaths(object):
             return self.get(params)
         return json.loads(response.text)
 
-    def get_last_lat(self):
-        params = {"num_points": 1}
 
-        return self.get(params)[0]["lat"]
+class SparkAPI(object):
+    def __init__(self):
+        self.url = "https://api.spark.io/v1/"
 
-    def get_last_lon(self):
-        params = {"num_points": 1}
+    def _new_token(self, username, password):
+        # TODO
+        resp = requests.post(self.url + "/oauth/token")
+        if resp.status_code == 200:
+            resp = json.loads(resp.text)
+            token = resp["access_token"]
+            expiry = resp["expires_in"] - 30
 
-        return self.get(params)[0]["lon"]
 
-    def get_last_time(self):
-        params = {"num_points": 1}
+class Location(object):
+    """
+    Simple class for (lat, lon) pairs.
+    """
+    def __init__(self, name, lat, lon, radius=6371000):
+        self.name = name
+        self.lat = lat
+        self.lon = lon
+        self.radius = radius
 
-        return self.get(params)[0]["t"]
+    def is_near(self, loc, dist):
+        """
+        Returns True if "loc" is within "dist" distance of self.
+        """
+        if self.distance(loc) <= dist:
+            return True
+        return False
+
+    def distance(self, loc):
+        """
+        Returns the Great Circle distance between "self" and "loc".
+        """
+        slon = math.radians(self.lon - loc.lon)
+        slat = math.radians(self.lat)
+        lat = math.radians(loc.lat)
+
+        dx = math.pow(math.cos(slon) * math.cos(slat) - math.cos(lat), 2)
+        dy = math.pow(math.sin(slon) * math.cos(slat), 2)
+        dz = math.pow(math.sin(slat) - math.sin(lat), 2)
+
+        return math.asin(math.sqrt(dx + dy + dz) / 2) * (2 * self.radius)
 
 
 class WhereAmI(object):
     """
     Main web app, serving out the most recent location data.
     """
-    def __init__(self, host, port, settings_path="settings.json"):
-        # Set instance variables
-        self.host = host
-        self.port = port
-
-        # Initialise app and route
-        self.app = bottle.Bottle()
-        self.routes()
-
+    def __init__(self, settings_path="settings.json"):
         # Load settings
         self.settings = self.load_settings(settings_path)
         self.openpaths = OpenPaths(self.settings["keys"]["access"],
                                    self.settings["keys"]["secret"])
+
+        # Read locations from configuration
+        self.locations = []
+        for loc in self.settings["locations"]:
+            l = Location(loc["name"], loc["lat"], loc["lon"])
+            self.locations.append(l)
 
     def load_settings(self, settings_path):
         """
@@ -109,58 +135,13 @@ class WhereAmI(object):
         """
         with open(settings_path, "r") as settings_file:
             settings = json.load(settings_file)
-
         return settings
-
-    def routes(self):
-        """
-        Build the main routing URLs for the web app.
-        """
-        self.app.route("/", method="GET", callback=self.root)
-        self.app.route("/lat", method="GET", callback=self.latitude)
-        self.app.route("/lon", method="GET", callback=self.longitude)
-        self.app.route("/time", method="GET", callback=self.time)
 
     def run(self, **kwargs):
         """
-        Run the main Bottle instance.
         """
-        self.app.run(host=self.host, port=self.port, **kwargs)
-
-    def latitude(self):
-        """
-        Return the most recent OpenPaths latitude.
-
-        @returns The most recent OpenPaths latitude as a string.
-        """
-        return str(self.openpaths.get_last_lat())
-
-    def longitude(self):
-        """
-        Return the most recent OpenPaths longitude.
-
-        @returns The most recent OpenPaths longitude as a string.
-        """
-        return str(self.openpaths.get_last_lon())
-
-    def time(self):
-        """
-        Return the most recent OpenPaths update timestamp
-
-        @returns The most recent OpenPaths timestamp.
-        """
-        dt = datetime.datetime.fromtimestamp(self.openpaths.get_last_time())
-        return dt.isoformat()
-
-    def root(self):
-        """
-        Return a message for the main web endpoint.
-
-        @returns A message for the main app route.
-        """
-        return "There is nothing here. Sorry and all that."
-
+        pass
 
 if __name__ == "__main__":
-    W = WhereAmI(host="localhost", port=6789)
-    W.run(quiet=True)
+    W = WhereAmI()
+    W.run()
