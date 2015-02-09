@@ -6,6 +6,7 @@ Simple Python script to interact with Spark and OpenPaths APIs.
 
 import math
 import oauth2
+import os
 import requests
 import simplejson as json
 import spyrk
@@ -156,5 +157,6 @@ class WhereAmI(object):
             time.sleep(300)
 
 if __name__ == "__main__":
+    print(os.getpid())
     W = WhereAmI()
     W.run()
