@@ -10,6 +10,7 @@ import os
 import requests
 import simplejson as json
 import spyrk
+import sys
 import time
 
 
@@ -108,7 +109,7 @@ class WhereAmI(object):
     """
     Main web app, serving out the most recent location data.
     """
-    def __init__(self, settings_path="settings.json"):
+    def __init__(self, pid_file, settings_path="settings.json"):
         # Load settings
         self.settings = self.load_settings(settings_path)
         self.openpaths = OpenPathsAPI(
@@ -127,6 +128,14 @@ class WhereAmI(object):
             l = Location(loc["name"], loc["lat"], loc["lon"])
             self.locations.append(l)
 
+        # Write PID to file
+        try:
+            with open(pid_file, "a") as f:
+                f.write("%d\n" % os.getpid())
+        except IOError:
+            sys.stderr.write("Cannot write PID to file. Exiting...")
+            exit(1)
+
     def load_settings(self, settings_path):
         """
         Read the application settings.
@@ -134,8 +143,12 @@ class WhereAmI(object):
         @param settings_path Path to JSON file containing application settings.
         @returns A dictionary containing the application settings.
         """
-        with open(settings_path, "r") as settings_file:
-            settings = json.load(settings_file)
+        try:
+            with open(settings_path, "r") as settings_file:
+                settings = json.load(settings_file)
+        except IOError:
+            sys.stderr.write("Cannot find %s, exiting...\n" % settings_path)
+            exit(1)
         return settings
 
     def run(self, **kwargs):
@@ -157,6 +170,6 @@ class WhereAmI(object):
             time.sleep(300)
 
 if __name__ == "__main__":
-    print(os.getpid())
-    W = WhereAmI()
+    pidfile = sys.argv[1]
+    W = WhereAmI(pidfile)
     W.run()

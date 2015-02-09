@@ -19,13 +19,18 @@ stop_cmd="whereami_stop"
 restart_cmd="whereami_restart"
 
 whereami="/usr/local/var/www/whereami"
+pid="/usr/local/var/www/whereami/whereami.pid"
 whereami_start() {
     whereami_stop;
-    cd $whereami && sudo -u www sh -c ". ./bin/activate && python whereami.py &"
+    cd $whereami && sudo -u www sh -c ". ./bin/activate && python whereami.py $pid &"
 }
 
 whereami_stop() {
-    sudo -u www sh -c "kill `sockstat -4l | grep 6789 | awk '{ print $3 }'` 2>/dev/null"
+    for p in `cat $pid`
+    do
+        sudo -u www sh -c "kill $p 2> /dev/null"
+    done
+    echo "" > $pid
 }
 
 whereami_status() {
@@ -38,8 +43,8 @@ whereami_status() {
 }
 
 whereami_restart() {
-    whereami_stop;
-    whereami_start;
+    whereami_stop
+    whereami_start
 }
 
 run_rc_command "$1"
