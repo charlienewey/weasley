@@ -152,7 +152,6 @@ class WhereAmI(object):
             if not loc_name:
                 loc_name = "TRAVELLING"
 
-            print loc_name
             self.device.new_location(loc_name)
             time.sleep(300)
 
