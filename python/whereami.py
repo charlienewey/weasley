@@ -10,6 +10,39 @@ import simplejson as json
 import time
 
 
+class Location(object):
+    """
+    Simple class for (lat, lon) pairs.
+    """
+    def __init__(self, name, lat, lon, radius=6371000):
+        self.name = name
+        self.lat = lat
+        self.lon = lon
+        self.radius = radius
+
+    def is_near(self, loc, dist):
+        """
+        Returns True if "loc" is within "dist" distance of self.
+        """
+        if self.distance(loc) <= dist:
+            return True
+        return False
+
+    def distance(self, loc):
+        """
+        Returns the Great Circle distance between "self" and "loc".
+        """
+        slon = math.radians(self.lon - loc.lon)
+        slat = math.radians(self.lat)
+        lat = math.radians(loc.lat)
+
+        dx = math.pow(math.cos(slon) * math.cos(slat) - math.cos(lat), 2)
+        dy = math.pow(math.sin(slon) * math.cos(slat), 2)
+        dz = math.pow(math.sin(slat) - math.sin(lat), 2)
+
+        return math.asin(math.sqrt(dx + dy + dz) / 2) * (2 * self.radius)
+
+
 class OpenPathsAPI(object):
     """
     Simple class to interact with data in the OpenPaths API.
@@ -63,51 +96,58 @@ class OpenPathsAPI(object):
             return self.get(params)
         return json.loads(response.text)
 
+    def get_last_location(self):
+        last_loc = self.get({"num_points": 1})
+        return Location("last_location", last_loc["lat"], last_loc["lon"])
+
 
 class SparkAPI(object):
-    def __init__(self):
-        self.url = "https://api.spark.io/v1/"
+    def __init__(self, username, password, device):
+        self.url = "https://api.spark.io"
 
-    def _new_token(self, username, password):
-        # TODO
-        resp = requests.post(self.url + "/oauth/token")
+        self.username = username
+        self.password = password
+        self.device = device
+
+        self.token = None
+        self.expiry = None
+        self._new_token()
+
+    def _new_token(self):
+        headers = {"encoding": "application/x-www-form-urlencoded",
+                   "auth": "spark:spark"}
+        params = {
+            "grant_type": "password",
+            "username": self.username,
+            "password": self.password
+        }
+
+        url = "%s/%s" % (self.url, "oauth/token")
+        resp = requests.post(url, headers=headers, params=params)
         if resp.status_code == 200:
             resp = json.loads(resp.text)
             token = resp["access_token"]
-            expiry = resp["expires_in"] - 30
+            expiry = time.time() + (resp["expires_in"] - 30)
 
+            self.token = token
+            self.expiry = expiry
+        else:
+            print resp
+            print resp.text
 
-class Location(object):
-    """
-    Simple class for (lat, lon) pairs.
-    """
-    def __init__(self, name, lat, lon, radius=6371000):
-        self.name = name
-        self.lat = lat
-        self.lon = lon
-        self.radius = radius
+    def function(self, fun, param):
+        if not self.token or not self.expiry or self.expiry > time.time():
+            self._new_token()
 
-    def is_near(self, loc, dist):
-        """
-        Returns True if "loc" is within "dist" distance of self.
-        """
-        if self.distance(loc) <= dist:
+        url = "%s/v1/devices/%s/%s" % (self.url, self.device, fun)
+        headers = {"Authorization: Bearer %s" % (self.token)}
+        params = {"args": param}
+
+        resp = requests.post(url, headers=headers, params=params)
+        if resp.status_code == 200:
             return True
+
         return False
-
-    def distance(self, loc):
-        """
-        Returns the Great Circle distance between "self" and "loc".
-        """
-        slon = math.radians(self.lon - loc.lon)
-        slat = math.radians(self.lat)
-        lat = math.radians(loc.lat)
-
-        dx = math.pow(math.cos(slon) * math.cos(slat) - math.cos(lat), 2)
-        dy = math.pow(math.sin(slon) * math.cos(slat), 2)
-        dz = math.pow(math.sin(slat) - math.sin(lat), 2)
-
-        return math.asin(math.sqrt(dx + dy + dz) / 2) * (2 * self.radius)
 
 
 class WhereAmI(object):
@@ -117,8 +157,10 @@ class WhereAmI(object):
     def __init__(self, settings_path="settings.json"):
         # Load settings
         self.settings = self.load_settings(settings_path)
-        self.openpaths = OpenPaths(self.settings["keys"]["access"],
-                                   self.settings["keys"]["secret"])
+        self.openpaths = OpenPathsAPI(
+            self.settings["keys"]["openpaths"]["access"],
+            self.settings["keys"]["openpaths"]["secret"]
+        )
 
         # Read locations from configuration
         self.locations = []

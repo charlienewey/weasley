@@ -1,5 +1,6 @@
-bottle
+hammock
 httplib2
 oauth2
 requests
 simplejson
+spyrk
