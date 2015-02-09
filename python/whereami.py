@@ -1,12 +1,14 @@
 #! /usr/bin/env python
 
 """
+Simple Python script to interact with Spark and OpenPaths APIs.
 """
 
 import math
 import oauth2
 import requests
 import simplejson as json
+import spyrk
 import time
 
 
@@ -97,57 +99,8 @@ class OpenPathsAPI(object):
         return json.loads(response.text)
 
     def get_last_location(self):
-        last_loc = self.get({"num_points": 1})
+        last_loc = self.get({"num_points": 1})[0]
         return Location("last_location", last_loc["lat"], last_loc["lon"])
-
-
-class SparkAPI(object):
-    def __init__(self, username, password, device):
-        self.url = "https://api.spark.io"
-
-        self.username = username
-        self.password = password
-        self.device = device
-
-        self.token = None
-        self.expiry = None
-        self._new_token()
-
-    def _new_token(self):
-        headers = {"encoding": "application/x-www-form-urlencoded",
-                   "auth": "spark:spark"}
-        params = {
-            "grant_type": "password",
-            "username": self.username,
-            "password": self.password
-        }
-
-        url = "%s/%s" % (self.url, "oauth/token")
-        resp = requests.post(url, headers=headers, params=params)
-        if resp.status_code == 200:
-            resp = json.loads(resp.text)
-            token = resp["access_token"]
-            expiry = time.time() + (resp["expires_in"] - 30)
-
-            self.token = token
-            self.expiry = expiry
-        else:
-            print resp
-            print resp.text
-
-    def function(self, fun, param):
-        if not self.token or not self.expiry or self.expiry > time.time():
-            self._new_token()
-
-        url = "%s/v1/devices/%s/%s" % (self.url, self.device, fun)
-        headers = {"Authorization: Bearer %s" % (self.token)}
-        params = {"args": param}
-
-        resp = requests.post(url, headers=headers, params=params)
-        if resp.status_code == 200:
-            return True
-
-        return False
 
 
 class WhereAmI(object):
@@ -161,6 +114,11 @@ class WhereAmI(object):
             self.settings["keys"]["openpaths"]["access"],
             self.settings["keys"]["openpaths"]["secret"]
         )
+        self.spark = spyrk.SparkCloud(
+            self.settings["keys"]["spark"]["username"],
+            self.settings["keys"]["spark"]["password"]
+        )
+        self.device = self.spark.devices["Ron"]
 
         # Read locations from configuration
         self.locations = []
@@ -181,8 +139,22 @@ class WhereAmI(object):
 
     def run(self, **kwargs):
         """
+        Check for last-known location and update the clock hand, and then
+        sleep for 5 minutes.
         """
-        pass
+        while True:
+            last_known = self.openpaths.get_last_location()
+            loc_name = None
+            for location in self.locations:
+                if location.is_near(last_known, 800):  # Half a mile
+                    loc_name = location.name
+
+            if not loc_name:
+                loc_name = "TRAVELLING"
+
+            print loc_name
+            self.device.new_location(loc_name)
+            time.sleep(300)
 
 if __name__ == "__main__":
     W = WhereAmI()
