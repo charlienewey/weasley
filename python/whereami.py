@@ -166,8 +166,13 @@ class WhereAmI(object):
             if not loc_name:
                 loc_name = "TRAVELLING"
 
-            self.device.new_location(loc_name)
-            time.sleep(300)
+            try:
+                self.device.new_location(loc_name)
+            except KeyError:  # Triggered if Spark doesn't send a response code
+                # Ignore the error because because because
+                pass
+
+            time.sleep(60)
 
 if __name__ == "__main__":
     pidfile = sys.argv[1]
